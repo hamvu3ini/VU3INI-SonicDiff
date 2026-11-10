@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VU3INI SonicDiff</title>
+<link rel="icon" type="image/png" href="/ui/assets/favicon.png">
+<link rel="stylesheet" href="/ui/style.css?v={{VERSION}}">
+<script>
+  try { const t = localStorage.getItem("sd-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <img class="logo" src="/ui/assets/logo.png" alt="VU3INI logo" id="logo">
+    <div class="name">VU3INI <span>SonicDiff</span></div>
+  </div>
+  <div class="studysel">
+    <label for="studyPick" class="muted small">Study</label>
+    <select id="studyPick" aria-label="Open study"><option value="">— none —</option></select>
+  </div>
+  <div class="spacer"></div>
+  <span class="badge" id="hwBadge">Checking hardware…</span>
+  <span class="badge hidden" id="jobBadge"></span>
+  <div class="theme-toggle" role="group" aria-label="Theme">
+    <button id="themeLight" aria-pressed="true">Light</button>
+    <button id="themeDark" aria-pressed="false">Dark</button>
+  </div>
+</header>
+
+<nav id="nav" aria-label="Steps">
+  <button data-tab="project" class="active"><span class="n">1</span>Project</button>
+  <button data-tab="import" data-needs="study"><span class="n">2</span>Import &amp; QC</button>
+  <button data-tab="prepare" data-needs="study"><span class="n">3</span>Prepare</button>
+  <button data-tab="tonic" data-needs="study"><span class="n">4</span>Tonic</button>
+  <button data-tab="segment" data-needs="study"><span class="n">5</span>Segment &amp; Annotate</button>
+  <button data-tab="rhythm" data-needs="study"><span class="n">6</span>Rhythm</button>
+  <button data-tab="analyse" data-needs="study"><span class="n">7</span>Analyse</button>
+  <button data-tab="compare" data-needs="study"><span class="n">8</span>Compare</button>
+  <button data-tab="report" data-needs="study"><span class="n">9</span>Report</button>
+  <div class="sep"></div>
+  <button data-tab="settings"><span class="n">⚙</span>Settings &amp; Tests</button>
+</nav>
+
+<main>
+<!-- 1 PROJECT -->
+<section class="panel active" id="p-project">
+  <h2>Project</h2>
+  <p class="lead">A study holds its comparison groups, singers, recordings, measurement constants and results in one folder that you can archive for examiners.</p>
+  <div class="grid2">
+    <div class="card">
+      <h3>Studies</h3>
+      <div id="studyList" class="stack"></div>
+      <div class="row" style="margin-top:12px"><button class="btn" id="demoBtn">Load demo study</button>
+        <span class="muted small">Synthetic recordings for trying every step.</span></div>
+    </div>
+    <div class="card">
+      <h3>New study</h3>
+      <div class="stack">
+        <label class="f">Name<input id="newName" placeholder="e.g. Borgeet vs Hindustani vs Opera"></label>
+        <label class="f">Description<textarea id="newDesc" placeholder="Research question, corpus notes"></textarea></label>
+        <div>
+          <div class="muted small" style="margin-bottom:4px">Comparison groups (one per line; add <code>| archival</code> or <code>| test</code> for groups analysed separately)</div>
+          <textarea id="newGroups">Borgeet
+Bhaona
+Hindustani khayal
+Western classical voice
+78 rpm archival | archival</textarea>
+        </div>
+        <div><button class="btn primary" id="createStudy">Create study</button></div>
+      </div>
+    </div>
+  </div>
+  <div id="studyDetail" class="hidden">
+    <div class="grid2">
+      <div class="card">
+        <h3>Groups</h3>
+        <div id="groupTable" class="tablewrap"></div>
+        <div class="row" style="margin-top:10px">
+          <input id="gName" placeholder="Group name">
+          <select id="gRole"><option value="study">study</option><option value="archival">archival</option><option value="test">test</option></select>
+          <button class="btn" id="addGroup">Add group</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Singers</h3>
+        <p class="muted small">The singer is the unit of analysis. Give every distinct singer one ID and use it in every recording they sing in.</p>
+        <div id="singerTable" class="tablewrap"></div>
+        <div class="row" style="margin-top:10px">
+          <input id="sgCode" placeholder="ID, e.g. BG-S01" style="width:130px">
+          <input id="sgName" placeholder="Name (optional)" style="width:150px">
+          <select id="sgVoice"><option value="male">male</option><option value="female">female</option><option value="other">other</option></select>
+          <button class="btn" id="addSinger">Save singer</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row"><h3 style="margin:0">Measurement constants</h3><span id="lockState" class="chip neutral"></span>
+        <div class="spacer"></div>
+        <button class="btn sm" id="resetConst">Reset to defaults</button>
+        <button class="btn sm" id="saveConst">Save</button>
+        <button class="btn sm primary" id="lockConst">Lock constants</button></div>
+      <p class="muted small">Defaults from the Sample Constants document. Lock them before analysing; analysis locks them automatically.</p>
+      <div id="constForm"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 IMPORT -->
+<section class="panel" id="p-import">
+  <h2>Import &amp; quality control</h2>
+  <p class="lead">Each file is copied into the study, hashed, and checked for clipping, true peak, noise, bandwidth, sample rate and lossy coding.</p>
+  <div class="card">
+    <h3>Add recordings</h3>
+    <div class="formgrid" id="metaDefaults"></div>
+    <div class="row" style="margin-top:12px">
+      <label class="f">Group<select id="impGroup"></select></label>
+    </div>
+    <div class="dropzone" id="drop" tabindex="0" style="margin-top:12px">Drop WAV, FLAC, MP3 or other audio files here, or click to choose<br><span class="small muted">Fields above are applied to every file in this batch; edit per file afterwards.</span></div>
+    <input type="file" id="fileIn" multiple accept="audio/*,.wav,.flac,.mp3,.ogg,.m4a,.aif,.aiff" class="hidden">
+    <div class="row" style="margin-top:10px"><input id="impPath" placeholder="…or a folder on this computer, e.g. D:\Recordings\Borgeet" style="flex:1">
+      <button class="btn" id="impPathBtn">Import folder</button></div>
+    <div id="impResult" class="small" style="margin-top:8px"></div>
+  </div>
+  <div class="card">
+    <div class="row"><h3 style="margin:0">Samples</h3><div class="spacer"></div><span id="qcSummary" class="small muted"></span></div>
+    <div id="sampleTable" class="tablewrap" style="margin-top:8px"></div>
+  </div>
+  <div class="card hidden" id="sampleDetail"></div>
+</section>
+
+<!-- 3 PREPARE -->
+<section class="panel" id="p-prepare">
+  <h2>Prepare</h2>
+  <p class="lead">Creates the <b>measurement copy</b> (mono, 48 kHz, DC removed, 60 Hz high-pass — the only audio values are read from) and the <b>guide copy</b> (noise-reduced, used only to find events). Voice separation is optional and its bias is measured.</p>
+  <div id="sepStatus" class="banner info"></div>
+  <div class="card">
+    <div class="row"><label><input type="checkbox" id="prepSep"> Separate voice from accompaniment (AI pack)</label>
+      <div class="spacer"></div><button class="btn primary" id="prepAll">Prepare all unprepared samples</button></div>
+    <div id="prepTable" class="tablewrap" style="margin-top:10px"></div>
+  </div>
+  <div class="card" id="listenCard">
+    <h3>Listen</h3>
+    <div class="row"><select id="listenSample"></select><select id="listenWhich">
+      <option value="original">original</option><option value="measure">measurement copy</option>
+      <option value="guide">guide copy</option><option value="vocals">vocal stem</option><option value="instrumental">accompaniment stem</option></select></div>
+    <audio id="listenAudio" controls style="width:100%;margin-top:10px"></audio>
+  </div>
+  <div class="card">
+    <h3>Separation bias (remix test)</h3>
+    <p class="small muted">Mixes clean held vowels with real accompaniment, separates the mix, and measures how far each feature moves. The shift is printed beside every value measured from a vocal stem.</p>
+    <div class="row"><select id="biasVowel"></select><select id="biasAcc"></select><button class="btn" id="biasAdd">Add pair</button>
+      <button class="btn primary" id="biasRun">Run remix test</button></div>
+    <div id="biasPairs" class="small" style="margin-top:6px"></div>
+    <div id="biasTable" class="tablewrap" style="margin-top:8px"></div>
+  </div>
+</section>
+
+<!-- 4 TONIC -->
+<section class="panel" id="p-tonic">
+  <h2>Tonic</h2>
+  <p class="lead">SonicDiff proposes the tonic (Sa from the drone and melody; key note for Western music). Listen against the reference tone, adjust, and confirm. Pitch is then measured in cents relative to it.</p>
+  <div class="card">
+    <div class="row">
+      <select id="tonicSample"></select>
+      <select id="tonicMethod"><option value="">method: automatic</option><option value="drone">drone + melody (Indian)</option><option value="key">key centre (Western)</option></select>
+      <button class="btn" id="tonicPropose">Propose tonic</button>
+      <span id="tonicState"></span>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <label class="f">Tonic (Hz)<input id="tonicHz" type="number" step="0.01" style="width:120px"></label>
+      <button class="btn sm" data-nudge="-10">−10 ¢</button><button class="btn sm" data-nudge="-1">−1 ¢</button>
+      <button class="btn sm" data-nudge="1">+1 ¢</button><button class="btn sm" data-nudge="10">+10 ¢</button>
+      <button class="btn sm" data-oct="0.5">Octave down</button><button class="btn sm" data-oct="2">Octave up</button>
+      <button class="btn" id="tonePlay">▶ Reference tone</button>
+      <button class="btn primary" id="tonicConfirm">Confirm tonic</button>
+    </div>
+    <div id="tonicAlts" class="small muted" style="margin-top:6px"></div>
+    <audio id="tonicAudio" controls style="width:100%;margin-top:10px"></audio>
+    <div id="tonicPlot" class="plot"></div>
+    <div class="row"><button class="btn sm" id="driftBtn">Correct archival speed drift</button><span class="small muted">For 78 rpm and tape transfers with a steady drone.</span></div>
+  </div>
+</section>
+
+<!-- 5 SEGMENT -->
+<section class="panel" id="p-segment">
+  <h2>Segment &amp; annotate</h2>
+  <p class="lead">Mark <b>phrases</b> (10–30 s, pitch, vibrato, timbre, envelope), <b>held vowels</b> (≥ 1 s, voice quality) and <b>rhythm</b> spans. Label each as free-rhythm or metred and assign the singer. Drag on the waveform to create a segment.</p>
+  <div class="card">
+    <div class="row">
+      <select id="segSample"></select>
+      <select id="segWhich"><option value="measure">measurement copy</option><option value="guide">guide copy</option><option value="vocals">vocal stem</option></select>
+      <button class="btn" id="segPlay">▶ / ❚❚</button>
+      <label class="small">Zoom <input type="range" id="segZoom" min="10" max="400" value="40"></label>
+      <div class="spacer"></div>
+      <button class="btn" id="segSuggest">Suggest segments</button>
+      <button class="btn hidden" id="segAcceptAll">Accept all suggestions</button>
+    </div>
+    <div id="segWave" class="wave" style="margin-top:10px"></div>
+    <div id="segSpec" class="wave" style="margin-top:6px"></div>
+    <div id="segPitch" class="plot" style="min-height:180px"></div>
+  </div>
+  <div class="grid2">
+    <div class="card" id="segForm">
+      <h3>Segment</h3>
+      <p class="muted small" id="segFormHint">Drag across the waveform, or select a segment in the list.</p>
+      <div class="formgrid">
+        <label class="f">Start (s)<input id="sfStart" type="number" step="0.01"></label>
+        <label class="f">End (s)<input id="sfEnd" type="number" step="0.01"></label>
+        <label class="f">Kind<select id="sfKind"><option value="phrase">phrase</option><option value="vowel">held vowel</option><option value="rhythm">rhythm</option></select></label>
+        <label class="f">Section<select id="sfSection"><option value="free">free-rhythm</option><option value="metred">metred</option></select></label>
+        <label class="f">Singer<input id="sfSinger" list="singerList" placeholder="singer ID"></label>
+        <label class="f">Vowel<input id="sfVowel" placeholder="e.g. a"></label>
+        <label class="f">Label<input id="sfLabel" placeholder="e.g. antara"></label>
+      </div>
+      <datalist id="singerList"></datalist>
+      <label class="f" style="margin-top:8px">Musicological note<textarea id="sfNotes"></textarea></label>
+      <div class="row" style="margin-top:8px">
+        <button class="btn primary" id="sfSave">Save segment</button>
+        <button class="btn" id="sfOrn">Find vibrato / ornaments</button>
+        <button class="btn danger" id="sfExclude">Exclude</button>
+        <button class="btn danger" id="sfDelete">Delete</button>
+      </div>
+      <div id="ornList" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h3>Segments in this sample</h3>
+      <div id="segTable" class="tablewrap"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Review queue: vibrato or ornament?</h3>
+    <p class="small muted">Oscillations near the boundary between vibrato (regular, 4.5–7.5 Hz) and ornament (gamak, andolan) wait here for your decision.</p>
+    <div id="reviewQueue" class="tablewrap"></div>
+  </div>
+</section>
+
+<!-- 6 RHYTHM -->
+<section class="panel" id="p-rhythm">
+  <h2>Rhythm</h2>
+  <p class="lead">Beats are proposed from the accompaniment, but only the marks you confirm are used. Tap the start of each tala or bar cycle while the recording plays.</p>
+  <div class="card">
+    <div class="row">
+      <select id="rhSample"></select>
+      <button class="btn" id="rhPropose">Propose beats</button>
+      <button class="btn" id="rhAccept">Accept proposed beats</button>
+      <div class="spacer"></div>
+      <button class="btn" id="rhPlay">▶ / ❚❚</button>
+      <button class="btn primary" id="rhTap">Tap cycle (Space)</button>
+      <button class="btn" id="rhUndo">Undo tap</button>
+      <button class="btn" id="rhClear">Clear taps</button>
+      <button class="btn primary" id="rhSave">Save cycles</button>
+    </div>
+    <div id="rhWave" class="wave" style="margin-top:10px"></div>
+    <div id="rhInfo" class="small muted" style="margin-top:6px"></div>
+    <div id="rhPlot" class="plot"></div>
+  </div>
+</section>
+
+<!-- 7 ANALYSE -->
+<section class="panel" id="p-analyse">
+  <h2>Analyse</h2>
+  <p class="lead">Measures every included segment with the locked constants. Each run stores the constants, software versions and file hashes for reproducibility.</p>
+  <div id="readiness" class="grid3"></div>
+  <div class="card">
+    <div class="row"><button class="btn primary" id="runAnalyse">Run analysis</button><div class="progress" style="flex:1"><div id="anProg"></div></div><span id="anMsg" class="small muted"></span></div>
+  </div>
+  <div class="card">
+    <div class="row"><h3 style="margin:0">Results (latest run)</h3><div class="spacer"></div>
+      <select id="resKind"><option value="">all kinds</option><option value="phrase">phrases</option><option value="vowel">held vowels</option><option value="rhythm">rhythm</option></select>
+      <input id="resFilter" placeholder="filter features" style="width:180px"></div>
+    <div id="resTable" class="tablewrap" style="max-height:480px;overflow:auto;margin-top:8px"></div>
+  </div>
+</section>
+
+<!-- 8 COMPARE -->
+<section class="panel" id="p-compare">
+  <h2>Compare</h2>
+  <div class="card">
+    <div class="row">
+      <div id="cmpGroups" class="row"></div>
+      <select id="cmpKind"><option value="">all segments</option><option value="phrase">phrases</option><option value="vowel">held vowels</option><option value="rhythm">rhythm</option></select>
+      <select id="cmpSection"><option value="">both sections</option><option value="free">free-rhythm</option><option value="metred">metred</option></select>
+      <button class="btn primary" id="cmpRun">Compare</button>
+    </div>
+  </div>
+  <div id="cmpLevel"></div>
+  <div class="card">
+    <div class="row"><h3 style="margin:0">Feature</h3><select id="cmpFeature"></select></div>
+    <div id="cmpPlot" class="plot"></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Effect sizes (singer means)</h3><div id="cmpEffects" class="tablewrap" style="max-height:420px;overflow:auto"></div></div>
+    <div class="card"><h3>Style map</h3><div id="cmpPca" class="plot"></div></div>
+  </div>
+  <div class="card"><h3>Group-effect tests</h3><div id="cmpTests" class="tablewrap" style="max-height:420px;overflow:auto"></div></div>
+</section>
+
+<!-- 9 REPORT -->
+<section class="panel" id="p-report">
+  <h2>Report</h2>
+  <p class="lead">Builds the thesis report: Word and PDF documents, 300 dpi figures (PNG and SVG), CSV/Excel tables, LaTeX tables, BibTeX and the methods, corpus, exclusion and reproducibility appendices.</p>
+  <div class="card">
+    <div class="formgrid">
+      <label class="f">Citation style<select id="repStyle"></select></label>
+      <label class="f">Segments<select id="repKind"><option value="">all</option><option value="phrase">phrases</option><option value="vowel">held vowels</option><option value="rhythm">rhythm</option></select></label>
+      <label class="f">Section<select id="repSection"><option value="">both</option><option value="free">free-rhythm</option><option value="metred">metred</option></select></label>
+    </div>
+    <div id="repGroups" class="row" style="margin-top:10px"></div>
+    <div class="row" style="margin-top:12px"><button class="btn primary" id="repBuild">Build report</button>
+      <button class="btn" id="repArchive">Archive whole study (zip)</button>
+      <div class="progress" style="flex:1"><div id="repProg"></div></div><span id="repMsg" class="small muted"></span></div>
+  </div>
+  <div class="card"><h3>Reports</h3><div id="repList"></div></div>
+  <div class="card"><h3>References preview</h3><div id="refPreview" class="small"></div></div>
+</section>
+
+<!-- 10 SETTINGS -->
+<section class="panel" id="p-settings">
+  <h2>Settings &amp; tests</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3>System</h3>
+      <dl class="kv" id="sysInfo"></dl>
+      <div class="row" style="margin-top:12px"><button class="btn danger" id="stopApp">Stop SonicDiff</button></div>
+    </div>
+    <div class="card">
+      <h3>Self-test</h3>
+      <p class="small muted">Checks every measure against signals with known answers, plus error handling and statistics. Takes about a minute.</p>
+      <div class="row"><button class="btn primary" id="stRun">Run self-test</button><div class="progress" style="flex:1"><div id="stProg"></div></div></div>
+      <div id="stSummary" style="margin-top:8px"></div>
+    </div>
+  </div>
+  <div class="card"><h3>Self-test results</h3><div id="stTable" class="tablewrap"></div></div>
+  <div class="grid2">
+    <div class="card"><h3>Exclusion log</h3><div id="exclLog" class="tablewrap" style="max-height:340px;overflow:auto"></div></div>
+    <div class="card"><h3>Activity log</h3><div id="actLog" class="tablewrap small" style="max-height:340px;overflow:auto"></div></div>
+  </div>
+  <div class="card small">
+    <h3>About</h3>
+    <p>VU3INI SonicDiff {{VERSION}} — cross-tradition vocal acoustic comparison for PhD research. By Sasanka Boruah -VU3INI.</p>
+    <p class="muted">Built on Praat (via Parselmouth, GPL), librosa, NumPy, SciPy, statsmodels, pandas, matplotlib, FastAPI, wavesurfer.js and Plotly. Licence texts are in the LICENSES folder. Results describe stylistic difference, not quality.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <span class="credit">By Sasanka Boruah -VU3INI</span>
+  <span id="footRight">v{{VERSION}}</span>
+</footer>
+<div id="toasts" aria-live="polite"></div>
+
+<script src="/ui/vendor/wavesurfer.min.js"></script>
+<script src="/ui/vendor/regions.min.js"></script>
+<script src="/ui/vendor/timeline.min.js"></script>
+<script src="/ui/vendor/spectrogram.min.js"></script>
+<script src="/ui/vendor/plotly.min.js"></script>
+<script src="/ui/app.js?v={{VERSION}}"></script>
+</body>
+</html>

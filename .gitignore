@@ -1,0 +1,20 @@
+# Large runtime folders (rebuilt from the portable package, not kept in Git)
+python/
+wheels/
+bin/
+models/
+ai_pack/
+
+# Your data and machine-specific files: never published
+projects/
+logs/
+cache/
+settings.json
+*.wav
+*.flac
+*.mp3
+*.zip
+
+# Python leftovers
+__pycache__/
+*.pyc
